@@ -8,8 +8,9 @@ bilstm:
 finetune:
 	python -m src.transformer_finetune
 eval:
-	@echo "Phase 5 has not been implemented yet."
+	python -m src.evaluate
+	python -m src.error_analysis
 app:
-	@echo "Phase 6 has not been implemented yet."
+	streamlit run app/streamlit_app.py
 test:
 	pytest -q

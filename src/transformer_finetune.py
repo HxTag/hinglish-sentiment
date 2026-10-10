@@ -50,6 +50,12 @@ def run_one(model_name: str, config: dict[str, Any], quick: bool) -> dict[str, A
     except ImportError as exc:
         raise ImportError("Install Phase 4 dependencies with: python -m pip install -r requirements.txt") from exc
 
+    gpu = torch.cuda.is_available()
+    if not gpu and not quick:
+        raise RuntimeError(
+            "Full transformer fine-tuning is blocked on CPU because it is impractically slow. "
+            "Use Colab/Kaggle GPU, or pass --quick for a small local debugging run."
+        )
     settings, paths, labels = config["transformer"], config["paths"], list(config["label_order"])
     processed = Path(paths["processed_dir"])
     train, validation, test = (pd.read_csv(processed / f"{split}.csv") for split in ("train", "validation", "test"))
@@ -83,11 +89,11 @@ def run_one(model_name: str, config: dict[str, Any], quick: bool) -> dict[str, A
         return {"accuracy": float(accuracy_score(actual, predicted)), "macro_f1": float(f1_score(actual, predicted, average="macro", zero_division=0))}
 
     key = safe_model_name(model_name)
-    model_dir, results_dir = Path(paths["models_dir"]) / f"transformer_{key}", Path(paths["results_dir"])
+    artifact_key = f"{key}_quick" if quick else key
+    model_dir, results_dir = Path(paths["models_dir"]) / f"transformer_{artifact_key}", Path(paths["results_dir"])
     model_dir.mkdir(parents=True, exist_ok=True)
-    gpu = torch.cuda.is_available()
     if not gpu:
-        LOGGER.warning("No GPU: use only --quick locally. Use Colab/Kaggle GPU for full fine-tuning.")
+        LOGGER.warning("CPU quick-debug run: its metrics are not reportable.")
     arguments = TrainingArguments(
         output_dir=str(model_dir), learning_rate=float(settings["learning_rate"]),
         per_device_train_batch_size=int(settings["batch_size"]), per_device_eval_batch_size=int(settings["batch_size"]),
@@ -108,11 +114,11 @@ def run_one(model_name: str, config: dict[str, Any], quick: bool) -> dict[str, A
     score = metrics((prediction.predictions, prediction.label_ids))
     score.update({"model": model_name, "training_seconds": elapsed, "quick_debug_run": quick})
     results_dir.mkdir(parents=True, exist_ok=True)
-    (results_dir / f"transformer_{key}_metrics.json").write_text(json.dumps(score, indent=2), encoding="utf-8")
+    (results_dir / f"transformer_{artifact_key}_metrics.json").write_text(json.dumps(score, indent=2), encoding="utf-8")
     actual = [labels[index] for index in prediction.label_ids]
     predicted = [labels[index] for index in np.argmax(prediction.predictions, axis=-1)]
-    (results_dir / f"transformer_{key}_classification_report.txt").write_text(classification_report(actual, predicted, labels=labels, zero_division=0), encoding="utf-8")
-    pd.DataFrame(confusion_matrix(actual, predicted, labels=labels), index=labels, columns=labels).to_csv(results_dir / f"transformer_{key}_confusion_matrix.csv")
+    (results_dir / f"transformer_{artifact_key}_classification_report.txt").write_text(classification_report(actual, predicted, labels=labels, zero_division=0), encoding="utf-8")
+    pd.DataFrame(confusion_matrix(actual, predicted, labels=labels), index=labels, columns=labels).to_csv(results_dir / f"transformer_{artifact_key}_confusion_matrix.csv")
     trainer.save_model(str(model_dir))
     tokenizer.save_pretrained(str(model_dir))
     LOGGER.info("%s: accuracy %.4f | macro-F1 %.4f | %.1fs", model_name, score["accuracy"], score["macro_f1"], elapsed)
@@ -128,7 +134,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     config = load_config(args.config)
     outcomes = [run_one(name, config, args.quick) for name in (args.models or config["transformer"]["model_names"])]
-    pd.DataFrame(outcomes).to_csv(Path(config["paths"]["results_dir"]) / "transformer_metrics.csv", index=False)
+    suffix = "_quick" if args.quick else ""
+    pd.DataFrame(outcomes).to_csv(Path(config["paths"]["results_dir"]) / f"transformer_metrics{suffix}.csv", index=False)
 
 
 if __name__ == "__main__":
