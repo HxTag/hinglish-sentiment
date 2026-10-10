@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -15,6 +16,12 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 
 from src.data_loader import load_config
+
+# This project uses PyTorch. Colab may contain a TensorFlow/protobuf combination
+# that is unrelated to this workflow but can be imported by Transformers unless
+# TensorFlow support is disabled before importing Transformers.
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
 
 LOGGER = logging.getLogger(__name__)
 
