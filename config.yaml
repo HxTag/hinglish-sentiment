@@ -1,0 +1,56 @@
+paths:
+  raw_data: data/raw/hinglish_sentiment.csv
+  processed_dir: data/processed
+  sample_data: data/sample/hinglish_smoke_sample.csv
+  models_dir: models
+  results_dir: results
+seed: 42
+columns:
+  text: text
+  label: label
+label_mapping:
+  positive: positive
+  negative: negative
+  neutral: neutral
+  "1": positive
+  "0": negative
+  "2": neutral
+label_order: [negative, neutral, positive]
+split:
+  train: 0.70
+  validation: 0.15
+  test: 0.15
+preprocessing:
+  lowercase: true
+  remove_urls: true
+  remove_mentions: true
+  remove_html: true
+  normalize_repeated_characters: true
+  max_repeated_characters: 2
+  emoji_to_text: true
+baseline:
+  word_ngram_range: [1, 2]
+  char_ngram_range: [3, 5]
+  max_features: 50000
+bilstm:
+  # Compact defaults keep CPU training practical for a college laptop.
+  embedding_dim: 64
+  hidden_dim: 64
+  num_layers: 1
+  dropout: 0.30
+  batch_size: 128
+  learning_rate: 0.001
+  epochs: 10
+  patience: 2
+  min_frequency: 1
+  max_vocab_size: 15000
+  max_length: 64
+transformer:
+  model_names: [l3cube-pune/hing-bert, google/muril-base-cased, xlm-roberta-base, bert-base-multilingual-cased]
+  max_length: 128
+  learning_rate: 0.00002
+  batch_size: 16
+  epochs: 3
+  patience: 2
+  weight_decay: 0.01
+  quick_subset_size: 300
